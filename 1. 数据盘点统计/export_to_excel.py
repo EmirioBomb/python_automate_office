@@ -24,6 +24,9 @@ from sys import exit
 import easygui as eg
 import pandas as pd
 import pinyin as py
+from openpyxl.styles import Alignment, Font
+from openpyxl.styles.borders import Border, Side
+from openpyxl.utils import get_column_letter
 
 import config as cf
 
@@ -180,12 +183,57 @@ def check_file():
         with open(cf.ABS_FILE_NAME, mode="w"): pass
 
 
+def initiate_cell_style(writer, file_name):
+    """
+    单元格样式格式化，主要添加边框，字体颜色，对齐方式，自动调整列宽度等.
+    其中自动调整列宽度只针对于常规默认字体大小(10)，字体大小若超过默认值，则需要重新设计自动调整列宽度算法
+    
+    :param ExcelWriter writer: 表格写入对象
+    :param String file_name: 要保存的文件名
+    """
+    # 获取工作簿对象
+    workbook = writer.book
+    # 启用当前工作表，可用 workbook.worksheets[0]代替active
+    worksheet = workbook.active
+
+    # 初始化单元络边框粗细与颜色
+    side = Side(style='thin', color='000000')
+    # 初始化单元格边框样式
+    border = Border(top=side, bottom=side, left=side, right=side)
+    # 初始化字体格式
+    font = Font(color='FF0000', bold=True, size=10)
+    # 初始化单元格对齐方式
+    alignment = Alignment(horizontal="center", vertical="center")
+
+    counter = 0                 # 计数器，第一行为主题区，单独设置样式
+    # 遍历单元格并初始化其样式
+    for row in worksheet:
+        counter += 1
+        for cell in row:
+            # 如果单元格数据为空时，不添加边框
+            # if worksheet[cell.coordinate].value:
+            #     worksheet[cell.coornidate].border = border
+            if counter == 1:    # 第一行为主题区，格式化字体大小与颜色
+                worksheet[cell.coordinate].font = font
+            worksheet[cell.coordinate].border = border
+            worksheet[cell.coordinate].alignment = alignment
+
+    # 自动调整每列的宽度，下述方法仅适用于字段大小为常规大小(10)，字段过大无法自动适应
+    # 临时解决方案: 通过计算当前字体大小后再进行适当的扩大最大长度，达到自动调整宽度的目的
+    for i in range(1, worksheet.max_column + 1):
+        worksheet.column_dimensions[get_column_letter(i)].bestFit = True
+        worksheet.column_dimensions[get_column_letter(i)].auto_size = True
+    # 保存当前工作簿
+    workbook.save(file_name)
+
+
 def export_excel(df, file_name):
     """
     导出excel文件
     """
     with pd.ExcelWriter(file_name, mode="w", engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name=cf.SHEET_NAME, index=False)
+            initiate_cell_style(writer, cf.ABS_FILE_NAME)
 
 
 def main():
